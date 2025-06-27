@@ -82,6 +82,9 @@ class ProjectionTrainer:
                 )
                 
                 loss = outputs.loss
+                if loss.dim() > 0:
+                    loss = loss.mean()
+                    
                 total_loss += loss.item()
                 total_steps += 1
         
