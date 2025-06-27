@@ -17,29 +17,20 @@ class ProjectionTrainer:
         model: SmolLM2Vision,
         config: TrainingConfig,
     ):
-        self.model = model
         self.config = config
         
-        if torch.cuda.device_count() > 1 and config.multi_gpu:
-            print(f"🚀 Using {torch.cuda.device_count()} GPUs!")
-            # Wrap model in DataParallel
-            self.model = DataParallel(self.model)
-            self.device = torch.device('cuda:0')  # Primary GPU
-            
-            # Access the underlying model for methods
-            self.base_model = self.model.module
+        self.base_model = model
+        self.base_model.set_training_mode('projection')
+        
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        if torch.cuda.device_count() > 1:
+            print(f"Using DataParallel with {torch.cuda.device_count()} GPUs")
+            self.model = DataParallel(self.base_model)
         else:
             print("Using single GPU")
-            self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-            self.base_model = self.model
+            self.model = self.base_model
             
         self.model.to(self.device)
-        
-        if isinstance(self.model, DataParallel):
-        # Access the actual model inside DataParallel wrapper
-            self.model.module.set_training_mode('projection')
-        else:
-            self.model.set_training_mode('projection')
         
         self.optimizer = self._create_optimizer()
         
@@ -202,10 +193,7 @@ class ProjectionTrainer:
         checkpoint_name = "final" if is_final else f"checkpoint-{self.global_step}"
         save_dir = os.path.join(self.config.output_dir, checkpoint_name)
         
-        if isinstance(self.model, DataParallel):
-            self.model.module.save_projection(save_dir)
-        else:
-            self.model.save_projection(save_dir)
+        self.base_model.save_projection(save_dir)
         
         # Save training state
         torch.save({
@@ -245,7 +233,7 @@ class ProjectionTrainer:
         
         if self.train_losses:
             train_losses_values = [loss for _, loss in self.train_losses]
-            print(f"Training Loss:")
+            print("Training Loss:")
             print(f"  Initial: {train_losses_values[0]:.4f}")
             print(f"  Final: {train_losses_values[-1]:.4f}")
             print(f"  Min: {min(train_losses_values):.4f}")
@@ -253,7 +241,7 @@ class ProjectionTrainer:
         
         if self.eval_losses:
             eval_losses_values = [loss for _, loss in self.eval_losses]
-            print(f"\nValidation Loss:")
+            print("\nValidation Loss:")
             print(f"  Initial: {eval_losses_values[0]:.4f}")
             print(f"  Final: {eval_losses_values[-1]:.4f}")
             print(f"  Best: {min(eval_losses_values):.4f}")

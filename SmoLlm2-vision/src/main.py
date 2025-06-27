@@ -72,10 +72,6 @@ def run():
     # Create model
     print("\nInitializing model...")
     model = SmolLM2Vision(model_config)
-    
-    if use_multi_gpu:
-        model = DataParallel(model)
-        print("Model wrapped in DataParallel")
         
     # Create data module
     print("Setting up data...")
