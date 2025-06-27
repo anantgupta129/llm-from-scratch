@@ -2,8 +2,9 @@ import os
 from pathlib import Path
 
 import torch
-from tqdm import tqdm
+from torch.nn.parallel import DataParallel
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 from transformers import get_linear_schedule_with_warmup
 
 from config import TrainingConfig
@@ -19,7 +20,19 @@ class ProjectionTrainer:
         self.model = model
         self.config = config
         
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        if torch.cuda.device_count() > 1 and config.multi_gpu:
+            print(f"🚀 Using {torch.cuda.device_count()} GPUs!")
+            # Wrap model in DataParallel
+            self.model = DataParallel(self.model, device_ids=config.device_ids)
+            self.device = torch.device('cuda:0')  # Primary GPU
+            
+            # Access the underlying model for methods
+            self.base_model = self.model.module
+        else:
+            print("Using single GPU")
+            self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+            self.base_model = self.model
+            
         self.model.to(self.device)
         
         self.model.set_training_mode('projection')
@@ -33,7 +46,9 @@ class ProjectionTrainer:
         self.eval_losses = []
         
     def _create_optimizer(self):
-        trainable_params = filter(lambda p: p.requires_grad, self.model.parameters())
+        model_to_optimize = self.base_model if hasattr(self, 'base_model') else self.model
+        trainable_params = filter(lambda p: p.requires_grad, model_to_optimize.parameters())
+        
         optimizer = torch.optim.AdamW(
             trainable_params, lr=self.config.learning_rate, weight_decay=self.config.weight_decay
         )
@@ -184,8 +199,10 @@ class ProjectionTrainer:
         checkpoint_name = "final" if is_final else f"checkpoint-{self.global_step}"
         save_dir = os.path.join(self.config.output_dir, checkpoint_name)
         
-        # Save model
-        self.model.save_projection(save_dir)
+        if isinstance(self.model, DataParallel):
+            self.model.module.save_projection(save_dir)
+        else:
+            self.model.save_projection(save_dir)
         
         # Save training state
         torch.save({

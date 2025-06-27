@@ -1,10 +1,27 @@
 import argparse
+import os
+
 import torch
+from torch.nn.parallel import DataParallel
 
 from config import ModelConfig, DataConfig, TrainingConfig
 from model import SmolLM2Vision
 from data import DataModule
 from trainer import ProjectionTrainer
+
+
+def setup_multi_gpu():
+    """Setup for multi-GPU training on Kaggle"""
+    # Set environment variables for better multi-GPU performance
+    os.environ['CUDA_VISIBLE_DEVICES'] = '0,1'  # Use both T4s
+    
+    # Check available GPUs
+    num_gpus = torch.cuda.device_count()
+    print(f"\n🖥️  GPUs Available: {num_gpus}")
+    for i in range(num_gpus):
+        print(f"   GPU {i}: {torch.cuda.get_device_name(i)} ({torch.cuda.get_device_properties(i).total_memory / 1024**3:.2f} GB)")
+    
+    return num_gpus
 
 def run():
     parser = argparse.ArgumentParser()
@@ -19,11 +36,22 @@ def run():
                        help="Number of samples to use (for debugging)")
     parser.add_argument("--num_epochs", type=int, default=10,
                        help="Number of epochs to train for")
+    parser.add_argument("--output_dir", type=str, default="./checkpoints",
+                       help="Output directory for checkpoints")
+    parser.add_argument("--multi_gpu", action="store_true", help="Use multi-GPU training")
+    
     args = parser.parse_args()
+    
+    num_gpus = setup_multi_gpu()
+    use_multi_gpu = num_gpus > 1 and args.multi_gpu
     
     model_config = ModelConfig()
     data_config = DataConfig()
-    training_config = TrainingConfig(num_epochs=args.num_epochs)
+    training_config = TrainingConfig(
+        num_epochs=args.num_epochs, 
+        output_dir=args.output_dir, 
+        multi_gpu=use_multi_gpu
+    )
     
     if args.batch_size is not None:
         training_config.batch_size = args.batch_size
@@ -31,6 +59,12 @@ def run():
     if args.num_samples is not None:
         data_config.num_samples = args.num_samples
     
+    # Adjust batch size for multi-GPU
+    if use_multi_gpu:
+        print("\n✅ Multi-GPU Training Enabled")
+        print(f"   Batch size per GPU: {training_config.batch_size}")
+        print(f"   Total batch size: {training_config.batch_size * num_gpus}")
+        
     print(f"Training Stage: {args.stage}")
     print(f"Model Config: {model_config.model_dump()}")
     print(f"Data Config: {data_config.model_dump()}")
@@ -39,6 +73,10 @@ def run():
     print("\nInitializing model...")
     model = SmolLM2Vision(model_config)
     
+    if use_multi_gpu:
+        model = DataParallel(model)
+        print("Model wrapped in DataParallel")
+        
     # Create data module
     print("Setting up data...")
     data_module = DataModule(data_config)
@@ -46,8 +84,9 @@ def run():
 
     # Get dataloaders
     mode = "pretrain" if args.stage == "projection" else "instruct"
-    train_loader = data_module.get_train_dataloader(batch_size=training_config.batch_size, mode=mode)
-    test_loader = data_module.get_test_dataloader(batch_size=training_config.batch_size, mode=mode)
+    bs = training_config.batch_size * num_gpus if use_multi_gpu else training_config.batch_size
+    train_loader = data_module.get_train_dataloader(batch_size=bs, mode=mode)
+    test_loader = data_module.get_test_dataloader(batch_size=bs, mode=mode)
     
     if mode == "pretrain":
         # Create trainer

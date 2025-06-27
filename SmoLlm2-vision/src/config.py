@@ -34,6 +34,7 @@ class TrainingConfig(BaseModel):
     weight_decay: float = 0.01
     max_grad_norm: float = 1.0
     
+    multi_gpu: bool = False
     logging_steps: int = 50
     save_steps: int = 500
     eval_steps: int = 500
