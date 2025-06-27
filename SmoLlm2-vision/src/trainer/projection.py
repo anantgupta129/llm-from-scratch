@@ -23,7 +23,7 @@ class ProjectionTrainer:
         if torch.cuda.device_count() > 1 and config.multi_gpu:
             print(f"🚀 Using {torch.cuda.device_count()} GPUs!")
             # Wrap model in DataParallel
-            self.model = DataParallel(self.model, device_ids=config.device_ids)
+            self.model = DataParallel(self.model)
             self.device = torch.device('cuda:0')  # Primary GPU
             
             # Access the underlying model for methods
@@ -209,7 +209,9 @@ class ProjectionTrainer:
             'global_step': self.global_step,
             'epoch': self.current_epoch,
             'config': self.config.model_dump(),
-            'training_mode': 'projection'
+            'training_mode': 'projection',
+            'train_losses': self.train_losses,
+            'eval_losses': self.eval_losses
         }, os.path.join(save_dir, "trainer_state.pt"))
         
         print(f"Checkpoint saved to {save_dir}")
