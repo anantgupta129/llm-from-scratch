@@ -189,7 +189,7 @@ def load_llava_pretrain_dataset(
         # Load images
         processed_data = []
         for idx, item in enumerate(data):
-            if idx % 1000 == 0:
+            if idx % 10000 == 0:
                 print(f"Loading images: {idx}/{len(data)}")
             
             try:
