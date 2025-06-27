@@ -127,6 +127,8 @@ class ProjectionTrainer:
                 )
                 
                 loss = outputs.loss
+                if loss.dim() > 0:
+                    loss = loss.mean()
                 
                 # Backward pass with gradient accumulation
                 loss = loss / self.config.gradient_accumulation_steps
