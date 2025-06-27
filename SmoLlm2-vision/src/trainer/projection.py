@@ -35,7 +35,11 @@ class ProjectionTrainer:
             
         self.model.to(self.device)
         
-        self.model.set_training_mode('projection')
+        if isinstance(self.model, DataParallel):
+        # Access the actual model inside DataParallel wrapper
+            self.model.module.set_training_mode('projection')
+        else:
+            self.model.set_training_mode('projection')
         
         self.optimizer = self._create_optimizer()
         
