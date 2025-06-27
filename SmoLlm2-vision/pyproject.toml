@@ -4,4 +4,15 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "accelerate>=1.8.1",
+    "datasets>=3.6.0",
+    "huggingface-hub>=0.33.1",
+    "pillow>=11.2.1",
+    "protobuf>=6.31.1",
+    "pydantic>=2.11.7",
+    "scikit-learn>=1.7.0",
+    "sentencepiece>=0.2.0",
+    "torch>=2.7.1",
+    "transformers>=4.53.0",
+]
