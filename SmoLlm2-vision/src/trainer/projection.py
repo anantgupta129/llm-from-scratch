@@ -101,18 +101,17 @@ class ProjectionTrainer:
         }
         
     def train(self, train_dataloader: DataLoader, eval_dataloader: DataLoader):
-        num_training_steps = len(train_dataloader) * self.config.num_epochs
         
+        num_training_steps = len(train_dataloader) * self.config.num_epochs
         scheduler = self._create_scheduler(num_training_steps)
         
-        if eval_dataloader is not None:
-            print("\nRunning initial evaluation...")
-            eval_metrics = self.evaluate(eval_dataloader)
-            print(f"Initial eval loss: {eval_metrics['eval_loss']:.4f}")
-            print(f"Initial eval perplexity: {eval_metrics['eval_perplexity']:.4f}")
-            self.eval_losses.append((0, eval_metrics['eval_loss']))
+        # if eval_dataloader is not None:
+        #     print("\nRunning initial evaluation...")
+        #     eval_metrics = self.evaluate(eval_dataloader)
+        #     print(f"Initial eval loss: {eval_metrics['eval_loss']:.4f}")
+        #     print(f"Initial eval perplexity: {eval_metrics['eval_perplexity']:.4f}")
+        #     self.eval_losses.append((0, eval_metrics['eval_loss']))
         
-            
         self.model.train()
         
         for epoch in range(1, self.config.num_epochs + 1):
