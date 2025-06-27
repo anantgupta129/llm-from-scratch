@@ -39,13 +39,15 @@ def run():
     parser.add_argument("--output_dir", type=str, default="./checkpoints",
                        help="Output directory for checkpoints")
     parser.add_argument("--multi_gpu", action="store_true", help="Use multi-GPU training")
+    parser.add_argument("--language_model", type=str, default="HuggingFaceTB/SmolLM2-1.7B",
+                       help="Language model to use")
     
     args = parser.parse_args()
     
     num_gpus = setup_multi_gpu()
     use_multi_gpu = num_gpus > 1 and args.multi_gpu
     
-    model_config = ModelConfig()
+    model_config = ModelConfig(language_model=args.language_model)
     data_config = DataConfig()
     training_config = TrainingConfig(
         num_epochs=args.num_epochs, 
