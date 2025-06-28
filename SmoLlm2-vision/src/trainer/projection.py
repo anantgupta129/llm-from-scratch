@@ -198,7 +198,7 @@ class ProjectionTrainer:
         checkpoint_name = "final" if is_final else f"checkpoint-{self.global_step}"
         save_dir = os.path.join(self.config.output_dir, checkpoint_name)
         
-        self.base_model.save_projection(save_dir)
+        self.base_model.save_checkpoint(save_dir)
         
         # Save training state
         torch.save({

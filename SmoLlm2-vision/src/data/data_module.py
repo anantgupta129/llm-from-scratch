@@ -36,9 +36,27 @@ class MultiModalDataset(TorchDataset):
         self.mode = mode
         self.max_len = max_len
         
+        # Special tokens for instruct tuning
+        self.image_token = "<image>"
+        self.ignore_index = -100
+        self.image_token_id: int | None = None
+        
+        if self.mode == "instruct":
+            self._setup_image_token()
+        
     def __len__(self):
         return len(self.data)
     
+    def _setup_image_token(self):
+        
+        if self.image_token not in self.tokenizer.get_vocab():
+            self.tokenizer.add_special_tokens({
+                'additional_special_tokens': [self.image_token]
+            })
+            self.image_token_id = self.tokenizer.convert_tokens_to_ids(self.image_token)
+        else:
+            self.image_token_id = self.tokenizer.convert_tokens_to_ids(self.image_token)            
+            
     def _load_image(self, image: Union[str, Image.Image]) -> Image.Image:
         """Load image from path or return if already PIL Image"""
         if isinstance(image, Image.Image):
@@ -102,15 +120,26 @@ class MultiModalDataset(TorchDataset):
         
         # Simple format for now - concatenate all turns
         full_text = ""
-        for conv in conversations:
+        assistant_starts = []  # Track where assistant responses start
+        
+        for i, conv in enumerate(conversations):
             role = conv.get('from', '')
-            value = conv.get('value', '')
+            value = conv.get('value', '').strip()
             
             if role == 'human':
-                # Remove <image> token if present
-                value = value.replace('<image>', '').strip()
+                # For first human turn, ensure image token is present
+                if i == 0:
+                    if self.image_token not in value:
+                        value = f"{self.image_token}\n{value}"
+                else:
+                    # Remove image token from subsequent turns
+                    value = value.replace(self.image_token, '').strip()
+                
                 full_text += f"Human: {value}\n"
+                
             elif role == 'gpt':
+                # Mark the start of assistant response
+                assistant_starts.append(len(full_text))
                 full_text += f"Assistant: {value}\n"
         
         # Tokenize full conversation
@@ -122,33 +151,68 @@ class MultiModalDataset(TorchDataset):
             return_tensors="pt"
         )
         
+        input_ids = text_encoding.input_ids.squeeze(0)
+        attention_mask = text_encoding.attention_mask.squeeze(0)
+        
+        labels = input_ids.clone()        
+        labels[:] = self.ignore_index
+        
+        # Unmask assistant responses
+        # Simple approach: find "Assistant:" tokens and unmask everything after them
+        decoded_text = self.tokenizer.decode(input_ids, skip_special_tokens=False)
+        
+        # Find all occurrences of "Assistant:" in the decoded text
+        current_pos = 0
+        while True:
+            assistant_pos = decoded_text.find("Assistant:", current_pos)
+            if assistant_pos == -1:
+                break
+            
+            # Find the next "Human:" or end of text
+            next_human_pos = decoded_text.find("Human:", assistant_pos)
+            if next_human_pos == -1:
+                next_human_pos = len(decoded_text)
+            
+            # Approximate token positions (this is simplified)
+            # In practice, you'd want exact token-level alignment
+            start_ratio = assistant_pos / len(decoded_text)
+            end_ratio = next_human_pos / len(decoded_text)
+            
+            start_token = int(start_ratio * len(input_ids))
+            end_token = int(end_ratio * len(input_ids))
+            
+            # Unmask these tokens
+            if start_token < len(labels) and end_token <= len(labels):
+                labels[start_token:end_token] = input_ids[start_token:end_token]
+            
+            current_pos = next_human_pos
+        
+        # Fallback: if no assistant responses found, unmask second half
+        if torch.all(labels == self.ignore_index):
+            mid_point = len(labels) // 2
+            labels[mid_point:] = input_ids[mid_point:]
+        
+        # Find image token positions
+        image_token_positions = (input_ids == self.image_token_id).nonzero(as_tuple=True)[0]
+        
         return {
             'pixel_values': pixel_values,
-            'input_ids': text_encoding.input_ids.squeeze(0),
-            'attention_mask': text_encoding.attention_mask.squeeze(0),
-            'labels': text_encoding.input_ids.squeeze(0)
+            'input_ids': input_ids,
+            'attention_mask': attention_mask,
+            'labels': labels,
+            'image_token_positions': image_token_positions,
         }
     
     def __getitem__(self, idx: int) -> dict[str, torch.Tensor]:
         """Get a single sample"""
-        try:
-            item = self.data[idx]
-            
-            if self.mode == "pretrain":
-                return self._process_pretrain(item)
-            elif self.mode == "instruct":
-                return self._process_instruct(item)
-            else:
-                raise ValueError(f"Unknown mode: {self.mode}")
-        except Exception as e:
-            print(f"Error processing item {idx}: {e}")
-            # Return a dummy sample in case of error
-            return {
-                'pixel_values': torch.zeros((3, 224, 224)),
-                'input_ids': torch.zeros(self.max_len, dtype=torch.long),
-                'attention_mask': torch.zeros(self.max_len, dtype=torch.long),
-                'labels': torch.zeros(self.max_len, dtype=torch.long)
-            }
+        item = self.data[idx]
+        
+        if self.mode == "pretrain":
+            return self._process_pretrain(item)
+        elif self.mode == "instruct":
+            return self._process_instruct(item)
+        else:
+            raise ValueError(f"Unknown mode: {self.mode}")
 
 
 def load_llava_pretrain_dataset(

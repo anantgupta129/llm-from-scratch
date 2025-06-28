@@ -8,12 +8,21 @@ class ModelConfig(BaseModel):
     language_model:  str = 'HuggingFaceTB/SmolLM2-1.7B'
     projection_type: Literal['mlp', 'linear'] = 'mlp'
     init_projection: bool = True
+    
+    # LoRA configuration for Stage 2
+    lora_r: int = 16  # LoRA rank
+    lora_alpha: int = 32  # LoRA scaling
+    lora_dropout: float = 0.1
+    lora_target_modules: list[str] = [
+        "q_proj", "v_proj", "k_proj", "o_proj",  # Attention
+        "gate_proj", "up_proj", "down_proj"      # MLP
+    ]
 
 
 class DataConfig(BaseModel):
     
     dataset_name: str = 'liuhaotian/LLaVA-CC3M-Pretrain-595K'
-    max_len: int = 512
+    max_len: int = 2048 #change to 512 for projection layer training
     split: str = "train"
     
     num_samples: int | None = None
@@ -29,15 +38,15 @@ class TrainingConfig(BaseModel):
     num_epochs: int = 3
     output_dir: str = "./checkpoints"
     gradient_accumulation_steps: int = 4
-    learning_rate: float = 2e-3
+    learning_rate: float = 2e-4
     warmup_ratio: float = 0.05
     weight_decay: float = 0.01
     max_grad_norm: float = 1.0
     
     multi_gpu: bool = False
+    fp16: bool = False
+    dataloader_num_workers: int = 2
+    
     logging_steps: int = 50
     save_steps: int = 500
     eval_steps: int = 500
-    
-    fp16: bool = False
-    dataloader_num_workers: int = 4
