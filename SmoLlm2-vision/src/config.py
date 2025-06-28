@@ -48,7 +48,7 @@ class TrainingConfig(BaseConfig):
     max_grad_norm: float = 1.0
     
     multi_gpu: bool = False
-    fp16: bool = False
+    fp16: bool = True
     dataloader_num_workers: int = 2
     
     logging_steps: int = 50
