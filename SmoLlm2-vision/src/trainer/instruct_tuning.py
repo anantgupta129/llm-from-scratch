@@ -47,6 +47,7 @@ class InstructionTrainer(Trainer):
             greater_is_better=False,
             dataloader_num_workers=training_config.dataloader_num_workers,
             remove_unused_columns=False,
+            report_to="none",
         )
         
         # Create custom optimizer with different learning rates
