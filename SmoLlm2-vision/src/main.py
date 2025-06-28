@@ -88,10 +88,6 @@ def run():
     print("Setting up data...")
     data_module = DataModule(data_config)
     data_module.setup(model_config)
-    
-    if len(data_module.tokenizer) > model.language_model.config.vocab_size:
-        print(f"Resizing model embeddings from {model.language_model.config.vocab_size} to {len(data_module.tokenizer)}")
-        model.language_model.resize_token_embeddings(len(data_module.tokenizer))
         
     if args.stage == "projection":
         bs = training_config.batch_size * num_gpus if use_multi_gpu else training_config.batch_size
@@ -109,6 +105,10 @@ def run():
         train_dataset = data_module.create_dataset(split="train", mode="instruct")
         eval_dataset = data_module.create_dataset(split="test", mode="instruct")
         
+        if len(train_dataset.tokenizer) > model.language_model.config.vocab_size:
+            print(f"Resizing model embeddings from {model.language_model.config.vocab_size} to {len(train_dataset.tokenizer)}")
+            model.language_model.resize_token_embeddings(len(train_dataset.tokenizer))
+            
         train_instruction(
             model=model,
             train_dataset=train_dataset,
