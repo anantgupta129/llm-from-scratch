@@ -4,6 +4,9 @@ from pydantic import BaseModel
 class BaseConfig(BaseModel):
     def to_json_string(self):
         return self.model_dump_json(indent=4)
+    
+    def to_dict(self):
+        return self.model_dump()
 
 class ModelConfig(BaseConfig):
     
