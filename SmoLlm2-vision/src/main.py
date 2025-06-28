@@ -43,6 +43,8 @@ def run():
                        help="Language model to use")
     parser.add_argument("--projection_checkpoint", type=str, default=None,
                        help="Path to MM projection weight file")
+    parser.add_argument("--gradient_accumulation_steps", type=int, default=4,
+                       help="Number of gradient accumulation steps")
     
     args = parser.parse_args()
     
@@ -61,7 +63,8 @@ def run():
         num_epochs=args.num_epochs, 
         output_dir=args.output_dir, 
         multi_gpu=use_multi_gpu,
-        projection_checkpoint=args.projection_checkpoint
+        projection_checkpoint=args.projection_checkpoint,
+        gradient_accumulation_steps=args.gradient_accumulation_steps
     )
     
     if args.batch_size is not None:
