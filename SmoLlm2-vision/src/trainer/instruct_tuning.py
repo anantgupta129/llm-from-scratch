@@ -41,6 +41,7 @@ class InstructionTrainer(Trainer):
             logging_steps=training_config.logging_steps,
             save_steps=training_config.save_steps,
             eval_steps=training_config.eval_steps,
+            eval_strategy="steps",
             save_strategy="steps",
             load_best_model_at_end=True,
             metric_for_best_model="eval_loss",
