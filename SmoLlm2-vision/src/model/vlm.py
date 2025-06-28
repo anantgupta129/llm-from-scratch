@@ -344,9 +344,6 @@ class SmolLM2Vision(nn.Module):
             lora_dir = save_dir / "lora_weights"
             self.language_model.save_pretrained(lora_dir)
             
-            if self.lora_config:
-                config_dict["lora_config"] = self.lora_config.to_dict()
-            
             print(f"LoRA weights saved to {save_dir}")
         
         with open(save_dir / "config.json", "w") as f:
