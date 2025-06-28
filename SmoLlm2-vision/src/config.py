@@ -54,6 +54,6 @@ class TrainingConfig(BaseConfig):
     fp16: bool = True
     dataloader_num_workers: int = 2
     
-    logging_steps: int = 50
-    save_steps: int = 500
-    eval_steps: int = 500
+    logging_steps: int = 20
+    save_steps: int = 20
+    eval_steps: int = 20
