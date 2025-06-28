@@ -1,8 +1,11 @@
 from typing import Literal
 from pydantic import BaseModel
 
+class BaseConfig(BaseModel):
+    def to_json_string(self):
+        return self.model_dump_json(indent=4, ensure_ascii=False)
 
-class ModelConfig(BaseModel):
+class ModelConfig(BaseConfig):
     
     vision_encoder: str = 'google/siglip-base-patch16-224'
     language_model:  str = 'HuggingFaceTB/SmolLM2-1.7B'
@@ -19,7 +22,7 @@ class ModelConfig(BaseModel):
     ]
 
 
-class DataConfig(BaseModel):
+class DataConfig(BaseConfig):
     
     dataset_name: str = 'liuhaotian/LLaVA-CC3M-Pretrain-595K'
     max_len: int = 2048 #change to 512 for projection layer training
@@ -32,11 +35,12 @@ class DataConfig(BaseModel):
     random_state: int = 42
 
 
-class TrainingConfig(BaseModel):
+class TrainingConfig(BaseConfig):
     
     batch_size: int = 16
     num_epochs: int = 3
     output_dir: str = "./checkpoints"
+    projection_checkpoint: str | None = None
     gradient_accumulation_steps: int = 4
     learning_rate: float = 2e-4
     warmup_ratio: float = 0.05

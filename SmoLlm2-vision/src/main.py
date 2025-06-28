@@ -60,7 +60,8 @@ def run():
     training_config = TrainingConfig(
         num_epochs=args.num_epochs, 
         output_dir=args.output_dir, 
-        multi_gpu=use_multi_gpu
+        multi_gpu=use_multi_gpu,
+        projection_checkpoint=args.projection_checkpoint
     )
     
     if args.batch_size is not None:
@@ -109,7 +110,6 @@ def run():
             train_dataset=train_dataset,
             eval_dataset=eval_dataset,
             training_config=training_config,
-            projection_checkpoint=args.projection_checkpoint
         )
     
 

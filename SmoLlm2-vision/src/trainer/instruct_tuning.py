@@ -17,12 +17,11 @@ class InstructionTrainer(Trainer):
         self, 
         model: SmolLM2Vision, 
         training_config: TrainingConfig,
-        projection_checkpoint: str,
         **kwargs
     ):
         # Load projection weights
-        print(f"Loading projection weights from: {projection_checkpoint}")
-        model.load_checkpoint(projection_checkpoint, load_lora=False)
+        print(f"Loading projection weights from: {training_config.projection_checkpoint}")
+        model.load_checkpoint(training_config.projection_checkpoint, load_lora=False)
         
         model.set_training_mode('lora_finetune')
         
@@ -62,7 +61,6 @@ class InstructionTrainer(Trainer):
         )
         
         self.training_config = training_config
-        self.projection_checkpoint = projection_checkpoint
         
     def _create_optimizer(self, model: SmolLM2Vision, config: TrainingConfig):
         """Create optimizer with different learning rates for projection and LoRA"""
@@ -116,14 +114,12 @@ def train_instruction(
     train_dataset,
     eval_dataset,
     training_config: TrainingConfig,
-    projection_checkpoint: str
 ):
     """Train instruction following with LoRA"""
     
     trainer = InstructionTrainer(
         model=model,
         training_config=training_config,
-        projection_checkpoint=projection_checkpoint,
         train_dataset=train_dataset,
         eval_dataset=eval_dataset,
     )
