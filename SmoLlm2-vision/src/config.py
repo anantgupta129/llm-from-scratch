@@ -3,7 +3,7 @@ from pydantic import BaseModel
 
 class BaseConfig(BaseModel):
     def to_json_string(self):
-        return self.model_dump_json(indent=4, ensure_ascii=False)
+        return self.model_dump_json(indent=4)
 
 class ModelConfig(BaseConfig):
     
