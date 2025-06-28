@@ -4,24 +4,49 @@ from typing import Literal
 
 import torch
 import torch.nn as nn
-from transformers import AutoModel, AutoModelForCausalLM, SiglipModel
-from peft import LoraConfig, get_peft_model, TaskType, PeftModel
-
+from transformers import AutoModel, AutoModelForCausalLM, SiglipModel, BitsAndBytesConfig
+from peft import LoraConfig, get_peft_model, TaskType, PeftModel, prepare_model_for_kbit_training
 from config import ModelConfig
 from .projection import ProjectionLayer
 
 
 class SmolLM2Vision(nn.Module):
-    def __init__(self, config: ModelConfig):
+    def __init__(self, config: ModelConfig, load_in_8bit: bool = False, load_in_4bit: bool = False):
         super().__init__()        
         
         self.config = config
+        
+        self.quantization_config = None
+        
+        # Configure quantization for language model only
+        if load_in_8bit or load_in_4bit:
+            self.quantization_config = BitsAndBytesConfig(
+                load_in_8bit=load_in_8bit,
+                load_in_4bit=load_in_4bit,
+                bnb_4bit_use_double_quant=load_in_4bit,  # Use double quantization for 4-bit
+                bnb_4bit_quant_type="nf4",  # Normal Float 4 quantization
+                bnb_4bit_compute_dtype=torch.float16,  # Compute in fp16
+            )
+            print(f"Loading language model with {'8-bit' if load_in_8bit else '4-bit'} quantization")
+        
         
         print(f"Loading vision encoder: {config.vision_encoder}")
         self.vision_tower = AutoModel.from_pretrained(config.vision_encoder)
         
         print(f"Loading language model: {config.language_model}")
-        self.language_model = AutoModelForCausalLM.from_pretrained(config.language_model)
+        self.language_model = AutoModelForCausalLM.from_pretrained(
+            config.language_model,
+            quantization_config=self.quantization_config,
+            device_map="auto" if self.quantization_config else None,
+            torch_dtype=torch.float16 if self.quantization_config else None,
+        )
+        
+        # Prepare model for k-bit training if quantized
+        if self.quantization_config:
+            self.language_model = prepare_model_for_kbit_training(
+                self.language_model, 
+                use_gradient_checkpointing=True
+            )
         
         # Get hidden sizes - handle SigLIP specifically
         if isinstance(self.vision_tower, SiglipModel):
@@ -282,7 +307,7 @@ class SmolLM2Vision(nn.Module):
             lora_alpha=self.config.lora_alpha,
             lora_dropout=self.config.lora_dropout,
             target_modules=self.config.lora_target_modules,
-            modules_to_save=["lm_head"],  # Also train the output layer
+            modules_to_save=["embed_tokens", "lm_head"] if self.quantization_config else ["lm_head"],
         )
         
         # Apply LoRA to language model

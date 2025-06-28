@@ -46,12 +46,25 @@ def run():
     parser.add_argument("--gradient_accumulation_steps", type=int, default=4,
                        help="Number of gradient accumulation steps")
     
+    parser.add_argument("--load_in_8bit", action="store_true",
+                       help="Load language model in 8-bit (only for LoRA stage)")
+    parser.add_argument("--load_in_4bit", action="store_true",
+                       help="Load language model in 4-bit (only for LoRA stage)")
+    
     args = parser.parse_args()
     
+    if (args.load_in_8bit or args.load_in_4bit) and args.stage == "projection":
+        print("⚠️  Warning: Quantization is only supported for LoRA stage. Ignoring quantization flags.")
+        args.load_in_8bit = False
+        args.load_in_4bit = False
+        
     if args.stage == "lora":
         print(f"\nProjection Checkpoint: {args.projection_checkpoint}")
         if not args.projection_checkpoint:
             raise ValueError("--projection_checkpoint is required for LoRA training")
+    
+    if args.load_in_8bit and args.load_in_4bit:
+        raise ValueError("Cannot use both 8-bit and 4-bit quantization. Choose one.")
         
     num_gpus = setup_multi_gpu()
     use_multi_gpu = num_gpus > 1 and args.multi_gpu
@@ -85,7 +98,12 @@ def run():
     
     # Create model
     print("\nInitializing model...")
-    model = SmolLM2Vision(model_config)
+    if args.stage == "lora" and (args.load_in_8bit or args.load_in_4bit):
+        print(f"Using {'8-bit' if args.load_in_8bit else '4-bit'} quantization for language model")
+        training_config.fp16 = True
+        model = SmolLM2Vision(model_config, load_in_8bit=args.load_in_8bit, load_in_4bit=args.load_in_4bit)
+    else:
+        model = SmolLM2Vision(model_config)
         
     # Create data module
     print("Setting up data...")
